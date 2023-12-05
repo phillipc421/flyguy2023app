@@ -1,0 +1,9 @@
+.form-container > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-container textarea {
+  resize: none;
+  min-height: 5rem;
+}
