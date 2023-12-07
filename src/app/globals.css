@@ -18,3 +18,8 @@ main {
 .home-products > * {
   flex-grow: 1;
 }
+
+.admin-section h2 {
+  border-bottom: 1px solid black;
+  margin-bottom: 1rem;
+}

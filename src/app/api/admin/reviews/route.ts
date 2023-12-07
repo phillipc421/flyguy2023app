@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
 
-import { pool } from "../../../config/db";
+import { pool } from "../../../../config/db";
 
 // create review
 export async function POST(req: NextRequest) {
@@ -20,10 +20,11 @@ export async function POST(req: NextRequest) {
       [product, reviewer, review]
     );
     client.release();
+    return NextResponse.json({ message: "added review" });
   } catch (e) {
     console.error(e);
+    return NextResponse.json({ error: e });
   }
-  return Response.redirect(req.nextUrl.origin + "/admin", 303);
 }
 
 // delete review

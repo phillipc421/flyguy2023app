@@ -7,11 +7,11 @@ export interface ReviewsListProps {
 
 export default function ReviewsList({ reviews }: ReviewsListProps) {
   return (
-    <section>
-      <h2>Existing Reviews</h2>
+    <>
+      <h3>Existing Reviews</h3>
       {reviews.map((review) => (
         <Review key={review.id} review={review}></Review>
       ))}
-    </section>
+    </>
   );
 }
