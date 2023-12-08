@@ -10,16 +10,25 @@ main {
 
 .home-products {
   display: flex;
-  flex-wrap: wrap;
+
+  flex-direction: column;
+  align-items: center;
   gap: 1rem;
-  background-color: aliceblue;
 }
 
-.home-products > * {
+/* .home-products > * {
   flex-grow: 1;
-}
+} */
 
 .admin-section h2 {
   border-bottom: 1px solid black;
   margin-bottom: 1rem;
+}
+
+@media (min-width: 68rem) {
+  .home-products {
+    flex-direction: row;
+    justify-content: center;
+    align-items: start;
+  }
 }

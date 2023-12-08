@@ -5,6 +5,8 @@ export interface DatabaseProduct {
   current_price: string;
   photo_url: string;
   description: string;
+  ingredients: string;
+  long_description: string;
 }
 
 export interface Product
