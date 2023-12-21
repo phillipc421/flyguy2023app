@@ -2,6 +2,8 @@ import { NextResponse, NextRequest } from "next/server";
 
 import { FlyGuyErrorResponse } from "@/utils/errorResponse";
 
+import { OrdersController } from "@/app/controllers/ordersController";
+
 import { pool } from "../../../../config/db";
 
 import { getPrices } from "@/utils/getPrices";
@@ -80,103 +82,105 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    console.log("++++++");
-    console.log(body);
-    const parsedBody = validateCreateOrderBody(body);
-    if (!parsedBody) {
-      return NextResponse.json(
-        { message: "Invalid body format" },
-        { status: 400 }
-      );
-    }
+  const controller = new OrdersController(req);
+  const res = await controller.createOrder();
+  return res;
+  // try {
+  //   const body = await req.json();
+  //   console.log("++++++");
+  //   console.log(body);
+  //   const parsedBody = validateCreateOrderBody(body);
+  //   if (!parsedBody) {
+  //     return NextResponse.json(
+  //       { message: "Invalid body format" },
+  //       { status: 400 }
+  //     );
+  //   }
 
-    //
+  //   //
 
-    const client = await pool.connect();
+  //   const client = await pool.connect();
 
-    const { order_items } = parsedBody;
+  //   const { order_items } = parsedBody;
 
-    // save prices to prevent repeat db calls;
-    const priceCache = await getPrices(client);
+  //   // save prices to prevent repeat db calls;
+  //   const priceCache = await getPrices(client);
 
-    console.log(priceCache);
+  //   console.log(priceCache);
 
-    // order items sum to the order total
-    const orderItemsSum = sumOrderItems(order_items, priceCache);
-    console.log(orderItemsSum, "order items sum");
+  //   // order items sum to the order total
+  //   const orderItemsSum = sumOrderItems(order_items, priceCache);
+  //   console.log(orderItemsSum, "order items sum");
 
-    if (orderItemsSum !== parsedBody.order_total) {
-      return NextResponse.json(
-        {
-          message:
-            "Sum of order_items must be equal to the value for order_total",
-        },
-        { status: 400 }
-      );
-    }
+  //   if (orderItemsSum !== parsedBody.order_total) {
+  //     return NextResponse.json(
+  //       {
+  //         message:
+  //           "Sum of order_items must be equal to the value for order_total",
+  //       },
+  //       { status: 400 }
+  //     );
+  //   }
 
-    // database create
+  //   // database create
 
-    const createQuery =
-      "INSERT INTO orders (customer_name, user_id, order_total) VALUES ($1, $2, $3) RETURNING *;";
+  //   const createQuery =
+  //     "INSERT INTO orders (customer_name, user_id, order_total) VALUES ($1, $2, $3) RETURNING *;";
 
-    const { rows } = <{ rows: DatabaseOrder[] }>(
-      await client.query(createQuery, [
-        parsedBody.customer_name,
-        parsedBody.user_id,
-        parsedBody.order_total,
-      ])
-    );
+  //   const { rows } = <{ rows: DatabaseOrder[] }>(
+  //     await client.query(createQuery, [
+  //       parsedBody.customer_name,
+  //       parsedBody.user_id,
+  //       parsedBody.order_total,
+  //     ])
+  //   );
 
-    const newOrder = rows[0];
+  //   const newOrder = rows[0];
 
-    // build the arguments for the query
-    // const { order_items } = parsedBody;
-    const queryArgs = new Array();
+  //   // build the arguments for the query
+  //   const queryArgs = new Array();
 
-    for (let i = 0; i < order_items.length; i++) {
-      const item = order_items[i];
-      const { id: productId, quantity } = item;
+  //   for (let i = 0; i < order_items.length; i++) {
+  //     const item = order_items[i];
+  //     const { id: productId, quantity } = item;
 
-      const price = priceCache.get(productId);
+  //     const price = priceCache.get(productId);
 
-      queryArgs.push(newOrder.id, productId, quantity, quantity * price);
-    }
+  //     queryArgs.push(newOrder.id, productId, quantity, quantity * price);
+  //   }
 
-    let createOrderItemsQuery =
-      "INSERT INTO order_items (order_id, product_id, quantity, order_item_total) VALUES";
+  //   let createOrderItemsQuery =
+  //     "INSERT INTO order_items (order_id, product_id, quantity, order_item_total) VALUES";
 
-    for (let i = 0; i < queryArgs.length; i += 4) {
-      createOrderItemsQuery +=
-        i === queryArgs.length - 4
-          ? ` ($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}) `
-          : ` ($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}),`;
-    }
+  //   for (let i = 0; i < queryArgs.length; i += 4) {
+  //     createOrderItemsQuery +=
+  //       i === queryArgs.length - 4
+  //         ? ` ($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}) `
+  //         : ` ($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}),`;
+  //   }
 
-    createOrderItemsQuery += "RETURNING *;";
+  //   createOrderItemsQuery += "RETURNING *;";
 
-    const { rows: orderItemRows } = await client.query(
-      createOrderItemsQuery,
-      queryArgs
-    );
+  //   const { rows: orderItemRows } = await client.query(
+  //     createOrderItemsQuery,
+  //     queryArgs
+  //   );
 
-    const requestResult = {
-      order: { ...newOrder, order_items: orderItemRows },
-    };
+  //   const requestResult = {
+  //     order: { ...newOrder, order_items: orderItemRows },
+  //   };
 
-    // TODO
-    // handle errors like bad product id
+  //   // TODO
+  //   // handle errors like bad product id
 
-    return NextResponse.json(
-      { message: "Order created", ...requestResult },
-      { status: 201 }
-    );
-  } catch (e) {
-    console.error(e);
-    return FlyGuyErrorResponse();
-  }
+  //   return NextResponse.json(
+  //     { message: "Order created", ...requestResult },
+  //     { status: 201 }
+  //   );
+  // } catch (e) {
+  //   console.error(e);
+  //   return FlyGuyErrorResponse();
+  // }
 }
 
 // move the order_item values under their own "items" property
