@@ -53,134 +53,26 @@ export interface CreateOrderItemDTO {
 
 export async function GET(req: NextRequest) {
   try {
-    const client = await pool.connect();
     const queryParams = req.nextUrl.searchParams;
     const orderId = queryParams.get("orderId");
+    const controller = new OrdersController(req);
     if (orderId) {
-      const query =
-        "SELECT orders.id, order_date, customer_name, user_id, order_total, name as product_name, quantity, order_item_total as item_total FROM orders JOIN order_items ON orders.id = order_items.order_id JOIN products ON order_items.product_id = products.id WHERE orders.id = $1";
-      const { rows } = <{ rows: DatabaseOrder[] }>(
-        await client.query(query, [orderId])
-      );
-
-      if (rows.length === 0) {
-        return NextResponse.json(
-          { message: `No order with ID: ${orderId}` },
-          { status: 404 }
-        );
-      }
-
-      return NextResponse.json({ order: parseOrderDTO(rows) });
+      return await controller.getOrder(orderId);
     }
-
-    const query = "SELECT * FROM orders";
-    const { rows } = await client.query(query);
-    return NextResponse.json({ orders: rows });
+    return await controller.getOrders();
   } catch (e) {
+    console.error("it errored");
     return FlyGuyErrorResponse();
   }
 }
 
 export async function POST(req: NextRequest) {
-  const controller = new OrdersController(req);
-  const res = await controller.createOrder();
-  return res;
-  // try {
-  //   const body = await req.json();
-  //   console.log("++++++");
-  //   console.log(body);
-  //   const parsedBody = validateCreateOrderBody(body);
-  //   if (!parsedBody) {
-  //     return NextResponse.json(
-  //       { message: "Invalid body format" },
-  //       { status: 400 }
-  //     );
-  //   }
-
-  //   //
-
-  //   const client = await pool.connect();
-
-  //   const { order_items } = parsedBody;
-
-  //   // save prices to prevent repeat db calls;
-  //   const priceCache = await getPrices(client);
-
-  //   console.log(priceCache);
-
-  //   // order items sum to the order total
-  //   const orderItemsSum = sumOrderItems(order_items, priceCache);
-  //   console.log(orderItemsSum, "order items sum");
-
-  //   if (orderItemsSum !== parsedBody.order_total) {
-  //     return NextResponse.json(
-  //       {
-  //         message:
-  //           "Sum of order_items must be equal to the value for order_total",
-  //       },
-  //       { status: 400 }
-  //     );
-  //   }
-
-  //   // database create
-
-  //   const createQuery =
-  //     "INSERT INTO orders (customer_name, user_id, order_total) VALUES ($1, $2, $3) RETURNING *;";
-
-  //   const { rows } = <{ rows: DatabaseOrder[] }>(
-  //     await client.query(createQuery, [
-  //       parsedBody.customer_name,
-  //       parsedBody.user_id,
-  //       parsedBody.order_total,
-  //     ])
-  //   );
-
-  //   const newOrder = rows[0];
-
-  //   // build the arguments for the query
-  //   const queryArgs = new Array();
-
-  //   for (let i = 0; i < order_items.length; i++) {
-  //     const item = order_items[i];
-  //     const { id: productId, quantity } = item;
-
-  //     const price = priceCache.get(productId);
-
-  //     queryArgs.push(newOrder.id, productId, quantity, quantity * price);
-  //   }
-
-  //   let createOrderItemsQuery =
-  //     "INSERT INTO order_items (order_id, product_id, quantity, order_item_total) VALUES";
-
-  //   for (let i = 0; i < queryArgs.length; i += 4) {
-  //     createOrderItemsQuery +=
-  //       i === queryArgs.length - 4
-  //         ? ` ($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}) `
-  //         : ` ($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}),`;
-  //   }
-
-  //   createOrderItemsQuery += "RETURNING *;";
-
-  //   const { rows: orderItemRows } = await client.query(
-  //     createOrderItemsQuery,
-  //     queryArgs
-  //   );
-
-  //   const requestResult = {
-  //     order: { ...newOrder, order_items: orderItemRows },
-  //   };
-
-  //   // TODO
-  //   // handle errors like bad product id
-
-  //   return NextResponse.json(
-  //     { message: "Order created", ...requestResult },
-  //     { status: 201 }
-  //   );
-  // } catch (e) {
-  //   console.error(e);
-  //   return FlyGuyErrorResponse();
-  // }
+  try {
+    const controller = new OrdersController(req);
+    return await controller.createOrder();
+  } catch (e) {
+    return FlyGuyErrorResponse();
+  }
 }
 
 // move the order_item values under their own "items" property
