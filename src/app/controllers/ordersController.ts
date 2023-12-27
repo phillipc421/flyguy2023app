@@ -11,8 +11,6 @@ import {
 import { DatabaseProduct } from "@/types/Product";
 
 /* TODO
-/* Make sure product ids are valid
-/* make sure user ids are valid
 /* handle guest orders (no user id)
 */
 
@@ -20,10 +18,12 @@ export class OrdersController {
   private pool: Pool;
   private client!: PoolClient;
   private priceCache: Map<any, any>;
+  private idList: Set<string>;
   constructor(private req: NextRequest) {
     this.req = req;
     this.pool = pool;
     this.priceCache = new Map();
+    this.idList = new Set();
   }
 
   private async connectClient() {
@@ -88,8 +88,23 @@ export class OrdersController {
 
       const { order_items } = parsedBody;
 
-      // save prices to prevent repeat db calls;
-      await this.getPrices();
+      // save prices and ids to prevent repeat db calls;
+      await this.getPricesAndIds();
+
+      // validate user id
+      const validUserId = await this.validateUserId(parsedBody.user_id);
+      if (!validUserId) {
+        return NextResponse.json(
+          { message: "Invalid user ID" },
+          { status: 400 }
+        );
+      }
+
+      // validate product ids
+      const invalidProduct = this.validateProductIds(order_items);
+      if (invalidProduct) {
+        return NextResponse.json({ message: invalidProduct }, { status: 400 });
+      }
 
       // order items sum to the order total
       const orderItemsSum = this.sumOrderItems(order_items);
@@ -252,12 +267,13 @@ export class OrdersController {
     }, Object.create(null));
   }
 
-  private async getPrices() {
+  private async getPricesAndIds() {
     const priceQuery = "SELECT id, current_price FROM products;";
     const { rows } = <
       { rows: Pick<DatabaseProduct, "current_price" | "id">[] }
     >await this.client.query(priceQuery);
     rows.forEach((product) => {
+      this.idList.add(product.id);
       if (!this.priceCache.has(product.id)) {
         const price = Number(product.current_price.slice(1));
         this.priceCache.set(product.id, price);
@@ -286,5 +302,28 @@ export class OrdersController {
       }
       return Object.assign(dto, orderDetails);
     }, Object.create(null));
+  }
+
+  private validateProductIds(orderItems: CreateOrderItemDTO[]) {
+    try {
+      orderItems.forEach((orderItem) => {
+        if (!this.idList.has(orderItem.id)) {
+          throw new Error("Invalid product ID: " + orderItem.id);
+        }
+      });
+      return false;
+    } catch (e) {
+      let err = e as { message: string };
+      return err.message;
+    }
+  }
+
+  private async validateUserId(userId: string) {
+    const userQuery = "SELECT * FROM users WHERE id = $1;";
+    const { rows } = await this.client.query(userQuery, [userId]);
+    if (rows.length === 0) {
+      return null;
+    }
+    return true;
   }
 }
