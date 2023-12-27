@@ -124,7 +124,7 @@ export class OrdersController {
       let newOrderItems = await this.createDBOrderItems(order_items, newOrder);
       if (!newOrderItems) {
         // delete the associated order
-        await this.deleteOrder(newOrder.id);
+        await this.deleteDBOrder(newOrder.id);
         throw new Error("Error creating order items in DB");
       }
       this.clientRelease();
@@ -140,9 +140,18 @@ export class OrdersController {
     }
   }
 
-  private async deleteOrder(orderId: number) {
-    const deleteQuery = "DELETE FROM orders WHERE id = $1;";
-    await this.client.query(deleteQuery, [orderId]);
+  public async deleteOrder(orderId: number) {
+    await this.connectClient();
+    const deletedOrder = await this.deleteDBOrder(orderId);
+    this.clientRelease();
+    const response = { message: "Order Deleted", order: deletedOrder };
+    return NextResponse.json(response);
+  }
+
+  private async deleteDBOrder(orderId: number) {
+    const deleteQuery = "DELETE FROM orders WHERE id = $1 RETURNING *;";
+    const { rows } = await this.client.query(deleteQuery, [orderId]);
+    return rows[0];
   }
 
   private async createDBOrder(parsedBody: CreateOrderDTO) {

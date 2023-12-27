@@ -75,81 +75,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// move the order_item values under their own "items" property
-// this just takes the SQL results and creates a DTO object for the response
-function parseOrderDTO(dbResults: DatabaseOrder[]): OrderDTO {
-  return dbResults.reduce((dto, curr) => {
-    const { product_name, quantity, item_total, ...orderDetails } = curr;
-    const itemEntry = { product_name, quantity, item_total };
-    if (dto.items) {
-      dto.items.push(itemEntry);
-    } else {
-      dto.items = [itemEntry];
+export async function DELETE(req: NextRequest) {
+  try {
+    const queryParams = req.nextUrl.searchParams;
+    const orderId = queryParams.get("orderId");
+    if (!orderId) {
+      return NextResponse.json(
+        { message: "Missing order ID" },
+        { status: 400 }
+      );
     }
-    return Object.assign(dto, orderDetails);
-  }, Object.create(null));
-}
-
-// make sure conforms to DTO standard
-function validateCreateOrderBody(body: {
-  [key: string]: any;
-}): CreateOrderDTO | null {
-  const expectedProperties = [
-    "user_id",
-    "customer_name",
-    "order_total",
-    "order_items",
-  ];
-  for (let i = 0; i < expectedProperties.length; i++) {
-    const property = expectedProperties[i];
-    if (!body.hasOwnProperty(property)) {
-      return null;
-    }
-    switch (property) {
-      case "user_id":
-      case "customer_name":
-        if (typeof body[property] !== "string") {
-          return null;
-        }
-        break;
-      case "order_total":
-        if (typeof body[property] !== "number") {
-          return null;
-        }
-        break;
-      case "order_items":
-        // not an array
-        if (!Array.isArray(body[property])) {
-          return null;
-        }
-        for (let j = 0; j < body[property].length; j++) {
-          const order_item = body[property][j];
-          console.log(order_item);
-          if (
-            !(
-              order_item.hasOwnProperty("id") &&
-              typeof order_item["id"] === "string"
-            )
-          ) {
-            return null;
-          }
-          console.log("order item id is a string");
-          if (
-            !(
-              order_item.hasOwnProperty("quantity") &&
-              typeof order_item["quantity"] === "number"
-            )
-          ) {
-            return null;
-          }
-          console.log("order item quantity is a number");
-        }
-        break;
-    }
+    const controller = new OrdersController(req);
+    return await controller.deleteOrder(Number(orderId));
+  } catch (e) {
+    return FlyGuyErrorResponse();
   }
-  // passed all checks, build dto object
-  return expectedProperties.reduce((dto, curr) => {
-    dto[curr] = body[curr];
-    return dto;
-  }, Object.create(null));
 }
