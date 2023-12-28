@@ -1,12 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthService } from "./app/services/AuthService";
-import { NextRequestWithAuth, withAuth } from "next-auth/middleware";
-import { NextMiddlewareWithAuth } from "next-auth/middleware";
-import { getSession } from "next-auth/react";
-
 import type { NextRequest } from "next/server";
-import { NextAuthOptions, Session, getServerSession } from "next-auth";
-import { nextAuthOptions } from "./app/api/auth/[...nextauth]/route";
 import { JWT, getToken } from "next-auth/jwt";
 
 export interface NextAuthTokenWithRole extends JWT {
@@ -15,25 +8,20 @@ export interface NextAuthTokenWithRole extends JWT {
 
 export async function middleware(req: NextRequest) {
   console.log("Middleware!!!!");
-  const token = await getToken({ req });
-  console.log(token);
+  // TODO
+  // ecxplore WWW-Authenticate header for 403's
+  console.log(await getToken({ req, raw: true }));
+  const token = (await getToken({ req })) as NextAuthTokenWithRole;
+  if (!token) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  if (token.role !== "admin") {
+    return NextResponse.json(
+      { message: "You do not have access to this resource" },
+      { status: 403 }
+    );
+  }
 }
-
-// export default withAuth(async function middleware(
-//   request: NextRequestWithAuth
-// ) {
-//   try {
-//     console.log("middle ware runs, start auth service");
-//     console.log(request.nextauth.token);
-//     const token = request.nextauth.token as NextAuthTokenWithRole;
-//     if (token.role !== "admin") {
-//       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-//     }
-//   } catch (e) {
-//     console.error(e);
-//     return NextResponse.next();
-//   }
-// });
 
 // See "Matching Paths" below to learn more
 export const config = {
