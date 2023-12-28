@@ -2,6 +2,17 @@ import { NextResponse, NextRequest } from "next/server";
 
 import { pool } from "../../../../config/db";
 
+export async function GET(req: NextRequest) {
+  try {
+    const client = await pool.connect();
+    const { rows } = await client.query("SELECT * FROM products;");
+    return NextResponse.json({ rows });
+  } catch (e) {
+    console.log(e);
+    return NextResponse.json(e);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
