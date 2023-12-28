@@ -1,17 +1,9 @@
 import { NextResponse, NextRequest } from "next/server";
-import { getServerSession } from "next-auth";
-import { nextAuthOptions } from "../../auth/[...nextauth]/route";
-import { AuthService } from "@/app/services/AuthService";
 
 import { pool } from "../../../../config/db";
 
 export async function GET(req: NextRequest) {
   try {
-    // const authService = new AuthService(nextAuthOptions);
-    // const isAdmin = await authService.isAdmin();
-    // if (!isAdmin)
-    //   return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-
     const client = await pool.connect();
     const { rows } = await client.query("SELECT * FROM products;");
     return NextResponse.json({ rows });
