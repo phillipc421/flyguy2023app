@@ -1,46 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { pool } from "@/config/db";
-import { Pool, PoolClient } from "pg";
-import {
-  CreateOrderDTO,
-  CreateOrderItemDTO,
-  DatabaseOrder,
-  OrderDTO,
-} from "../api/admin/orders/route";
-import { DatabaseProduct } from "@/types/Product";
+import { OrdersService } from "../services/OrdersService";
+import { CreateOrderDTO } from "@/types/Orders";
 
 /* TODO
 /* handle guest orders (no user id)
 */
 
 export class OrdersController {
-  private pool: Pool;
-  private client!: PoolClient;
-  private priceCache: Map<any, any>;
-  private idList: Set<string>;
+  private ordersService: OrdersService;
   constructor(private req: NextRequest) {
     this.req = req;
-    this.pool = pool;
-    this.priceCache = new Map();
-    this.idList = new Set();
-  }
-
-  private async connectClient() {
-    this.client = await this.pool.connect();
-  }
-
-  private clientRelease() {
-    this.client.release();
+    this.ordersService = new OrdersService();
   }
 
   public async getOrders() {
     try {
-      await this.connectClient();
-      const query = "SELECT * FROM orders";
-      const { rows } = await this.client.query(query);
-      this.clientRelease();
-      return NextResponse.json({ orders: rows });
+      const orders = await this.ordersService.getOrders();
+      return NextResponse.json({ orders });
     } catch (e) {
       console.error(this.getOrders.name, e);
       throw e;
@@ -49,24 +26,7 @@ export class OrdersController {
 
   public async getOrder(orderId: string) {
     try {
-      await this.connectClient();
-      const query =
-        "SELECT orders.id, order_date, customer_name, user_id, order_total, name as product_name, quantity, order_item_total as item_total FROM orders JOIN order_items ON orders.id = order_items.order_id JOIN products ON order_items.product_id = products.id WHERE orders.id = $1";
-      const { rows } = <{ rows: DatabaseOrder[] }>(
-        await this.client.query(query, [orderId])
-      );
-
-      this.clientRelease();
-
-      if (rows.length === 0) {
-        return NextResponse.json(
-          { message: `No order with ID: ${orderId}` },
-          { status: 404 }
-        );
-      }
-
-      const order = this.parseOrderDTO(rows);
-
+      const order = await this.ordersService.getOrder(Number(orderId));
       return NextResponse.json({ order });
     } catch (e) {
       console.error(this.getOrder.name, e);
@@ -76,7 +36,7 @@ export class OrdersController {
 
   public async createOrder() {
     try {
-      await this.connectClient();
+      // should the body parsing be a part of order service?
       const body = await this.req.json();
       const parsedBody = this.validateCreateOrderBody(body);
       if (!parsedBody) {
@@ -85,54 +45,14 @@ export class OrdersController {
           { status: 400 }
         );
       }
-
-      const { order_items } = parsedBody;
-
-      // save prices and ids to prevent repeat db calls;
-      await this.getPricesAndIds();
-
-      // validate user id
-      const validUserId = await this.validateUserId(parsedBody.user_id);
-      if (!validUserId) {
-        return NextResponse.json(
-          { message: "Invalid user ID" },
-          { status: 400 }
-        );
-      }
-
-      // validate product ids
-      const invalidProduct = this.validateProductIds(order_items);
-      if (invalidProduct) {
-        return NextResponse.json({ message: invalidProduct }, { status: 400 });
-      }
-
-      // order items sum to the order total
-      const orderItemsSum = this.sumOrderItems(order_items);
-
-      if (orderItemsSum !== parsedBody.order_total) {
-        return NextResponse.json(
-          {
-            message:
-              "Sum of order_items must be equal to the value for order_total",
-          },
-          { status: 400 }
-        );
-      }
-
-      const newOrder = await this.createDBOrder(parsedBody);
-      if (!newOrder) throw new Error("Error creating order in DB");
-      let newOrderItems = await this.createDBOrderItems(order_items, newOrder);
-      if (!newOrderItems) {
-        // delete the associated order
-        await this.deleteDBOrder(newOrder.id);
-        throw new Error("Error creating order items in DB");
-      }
-      this.clientRelease();
+      const newOrder = await this.ordersService.createOrder(parsedBody);
+      if (!newOrder) throw new Error("There was an error creating the order");
 
       const response = {
         message: "Order Created",
-        order: { ...newOrder, order_items: newOrderItems },
+        order: newOrder,
       };
+
       return NextResponse.json(response, { status: 201 });
     } catch (e) {
       console.error(this.createOrder.name, e);
@@ -141,74 +61,18 @@ export class OrdersController {
   }
 
   public async deleteOrder(orderId: number) {
-    await this.connectClient();
-    const deletedOrder = await this.deleteDBOrder(orderId);
-    this.clientRelease();
-    const response = { message: "Order Deleted", order: deletedOrder };
-    return NextResponse.json(response);
-  }
-
-  private async deleteDBOrder(orderId: number) {
-    const deleteQuery = "DELETE FROM orders WHERE id = $1 RETURNING *;";
-    const { rows } = await this.client.query(deleteQuery, [orderId]);
-    return rows[0];
-  }
-
-  private async createDBOrder(parsedBody: CreateOrderDTO) {
     try {
-      const createQuery =
-        "INSERT INTO orders (customer_name, user_id, order_total) VALUES ($1, $2, $3) RETURNING *;";
-
-      const { rows } = <{ rows: DatabaseOrder[] }>(
-        await this.client.query(createQuery, [
-          parsedBody.customer_name,
-          parsedBody.user_id,
-          parsedBody.order_total,
-        ])
-      );
-      return rows[0];
+      const deletedOrder = await this.ordersService.deleteOrder(orderId);
+      if (!deletedOrder)
+        throw new Error("There was an error deleting the order");
+      const response = {
+        message: "Order Deleted",
+        order: deletedOrder,
+      };
+      return NextResponse.json(response);
     } catch (e) {
-      console.error(this.createDBOrder.name, e);
-    }
-  }
-
-  private async createDBOrderItems(
-    orderItems: CreateOrderItemDTO[],
-    newOrder: DatabaseOrder
-  ) {
-    try {
-      // build the arguments for the query
-      const queryArgs = new Array();
-
-      for (let i = 0; i < orderItems.length; i++) {
-        const item = orderItems[i];
-        const { id: productId, quantity } = item;
-
-        const price = this.priceCache.get(productId);
-
-        queryArgs.push(newOrder.id, productId, quantity, quantity * price);
-      }
-
-      let createOrderItemsQuery =
-        "INSERT INTO order_items (order_id, product_id, quantity, order_item_total) VALUES";
-
-      for (let i = 0; i < queryArgs.length; i += 4) {
-        createOrderItemsQuery +=
-          i === queryArgs.length - 4
-            ? ` ($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}) `
-            : ` ($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}),`;
-      }
-
-      createOrderItemsQuery += "RETURNING *;";
-
-      const { rows: orderItemRows } = await this.client.query(
-        createOrderItemsQuery,
-        queryArgs
-      );
-
-      return orderItemRows;
-    } catch (e) {
-      console.error(this.createDBOrderItems.name, e);
+      console.error(this.deleteOrder.name, e);
+      throw e;
     }
   }
 
@@ -274,65 +138,5 @@ export class OrdersController {
       dto[curr] = body[curr];
       return dto;
     }, Object.create(null));
-  }
-
-  private async getPricesAndIds() {
-    const priceQuery = "SELECT id, current_price FROM products;";
-    const { rows } = <
-      { rows: Pick<DatabaseProduct, "current_price" | "id">[] }
-    >await this.client.query(priceQuery);
-    rows.forEach((product) => {
-      this.idList.add(product.id);
-      if (!this.priceCache.has(product.id)) {
-        const price = Number(product.current_price.slice(1));
-        this.priceCache.set(product.id, price);
-      }
-    });
-  }
-
-  private sumOrderItems(orderItems: CreateOrderItemDTO[]) {
-    return orderItems.reduce(
-      (sum, orderItem) =>
-        (sum += this.priceCache.get(orderItem.id) * orderItem.quantity),
-      0
-    );
-  }
-
-  // move the order_item values under their own "items" property
-  // this just takes the SQL results and creates a DTO object for the response
-  private parseOrderDTO(dbResults: DatabaseOrder[]): OrderDTO {
-    return dbResults.reduce((dto, curr) => {
-      const { product_name, quantity, item_total, ...orderDetails } = curr;
-      const itemEntry = { product_name, quantity, item_total };
-      if (dto.items) {
-        dto.items.push(itemEntry);
-      } else {
-        dto.items = [itemEntry];
-      }
-      return Object.assign(dto, orderDetails);
-    }, Object.create(null));
-  }
-
-  private validateProductIds(orderItems: CreateOrderItemDTO[]) {
-    try {
-      orderItems.forEach((orderItem) => {
-        if (!this.idList.has(orderItem.id)) {
-          throw new Error("Invalid product ID: " + orderItem.id);
-        }
-      });
-      return false;
-    } catch (e) {
-      let err = e as { message: string };
-      return err.message;
-    }
-  }
-
-  private async validateUserId(userId: string) {
-    const userQuery = "SELECT * FROM users WHERE id = $1;";
-    const { rows } = await this.client.query(userQuery, [userId]);
-    if (rows.length === 0) {
-      return null;
-    }
-    return true;
   }
 }
