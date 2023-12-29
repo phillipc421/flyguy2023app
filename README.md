@@ -1,36 +1,24 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# FLYGUY2023APP - UI for FLYGUY Hair Store
 
-## Getting Started
+This is a Next.js app that makes use of a PostgreSQL database. You will need a local copy of postgres or alter the code to support a cloud provider. The DB schema and seeding files are part of the [FLYGUY2023db sibling repository](https://github.com/phillipc421/flyguy2023db).
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+I will update this README as I continue development, but the planned tech stack is as follows:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Next.js - front end
+- Node.js - server (only Express!)
+  - Next-Auth for OAuth
+  - Stripe for payment processing
+- PostgreSQL - db
+- Vercel - Cloud provider (probably switch to AWS)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## The Business
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+The business is technically functional, as in I still have inventory that can be sold, but I'm not actively marketing or pursuing growth. I consider the business failed, and I poke fun at this in the front end static code, but it was fun and a good learning experience. We also actually did make quality products, and the few customers we did have had good things to say. We still have some repeat customers to this day. Email me or wait for this project to be live if you want to buy some 😉.
 
-## Learn More
+As I have shifted focus to software engineering, I thought it would be a good project to reimplement what was once a Shopify store to a fully custom and self-serviced application.
 
-To learn more about Next.js, take a look at the following resources:
+## Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+`npm run dev` to boot up the dev server, all the basic Next.js defaults. Again, you will need a local copy of postgres and configure a db to point to in your `.env` file(s). See the sibling repository, [flyguy2023db](https://github.com/phillipc421/flyguy2023db), if you want to mimic my local setup. Extend as you see fit.
