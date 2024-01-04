@@ -30,6 +30,22 @@ export default function ProductCard({ product }: ProductCardProps) {
     setTabIndex(i);
   };
 
+  const addToCartHandler = () => {
+    const cart = localStorage.getItem("cart");
+    if (!cart) {
+      return localStorage.setItem("cart", JSON.stringify({ [product.id]: 1 }));
+    }
+    // {productId: quantity}
+    const cartMap = JSON.parse(cart) as { [key: string]: number };
+    if (cartMap[product.id]) {
+      cartMap[product.id]++;
+    } else {
+      cartMap[product.id] = 1;
+    }
+
+    localStorage.setItem("cart", JSON.stringify(cartMap));
+  };
+
   const tabContent = [product.long_description, product.ingredients];
 
   return (
@@ -65,7 +81,9 @@ export default function ProductCard({ product }: ProductCardProps) {
         </Box>
       </CardContent>
       <CardActions>
-        <Button variant="contained">Add To Cart</Button>
+        <Button variant="contained" onClick={addToCartHandler}>
+          Add To Cart
+        </Button>
       </CardActions>
     </Card>
   );
