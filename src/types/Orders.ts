@@ -1,7 +1,3 @@
-export interface OrdersDTO {
-  orders: DatabaseOrder[];
-}
-
 export interface OrderDTO {
   items: OrderItemDTO[];
   id: number;
@@ -12,17 +8,6 @@ export interface OrderDTO {
 }
 
 export interface OrderItemDTO {
-  product_name: string;
-  quantity: string;
-  item_total: string;
-}
-
-export interface DatabaseOrder {
-  id: number;
-  order_date: string;
-  customer_name: string;
-  user_id: string;
-  order_total: string;
   product_name: string;
   quantity: string;
   item_total: string;
@@ -46,6 +31,7 @@ export interface DatabaseOrderFull {
   customer_name: string;
   user_id: string;
   order_total: string;
+  status: "new" | "paid" | "canceled" | "fulfilled";
 }
 
 export interface DatabaseOrderWithItems {
