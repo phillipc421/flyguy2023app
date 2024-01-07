@@ -1,4 +1,4 @@
-import { CreateOrderItemDTO } from "@/app/api/admin/orders/route";
+import { CreateOrderItemDTO } from "@/app/api/orders/route";
 
 export function sumOrderItems(
   orderItems: CreateOrderItemDTO[],

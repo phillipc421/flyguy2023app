@@ -9,6 +9,7 @@ import { FlyGuyJWT } from "@/types/Token";
 
 import { OrdersService } from "@/app/services/OrdersService";
 import { CreateOrderDTO } from "@/types/Orders";
+import { PoolClient } from "pg";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -27,6 +28,26 @@ function calcPrices(
   }
   // stripe reads in the smallest currency unit
   return total * 100;
+}
+
+/*
+ * Creates description for stripe payment intent - customer sees this
+ */
+async function createDescription(
+  clientProducts: { id: string; quantity: number }[],
+  dbClient: PoolClient
+) {
+  // get product names
+  const { rows } = <{ rows: Pick<DatabaseProduct, "id" | "name">[] }>(
+    await dbClient.query("SELECT id, name FROM products;")
+  );
+
+  const descriptionString = clientProducts.reduce((descString, product) => {
+    const { name } = rows.find((dbProduct) => dbProduct.id === product.id)!;
+    return (descString += `${product.quantity}x ${name},`);
+  }, "");
+
+  return descriptionString.slice(0, descriptionString.length - 1);
 }
 
 // create stripe payment intent
@@ -62,6 +83,7 @@ export async function POST(req: NextRequest) {
       currency: "usd",
       customer: token.stripeUser,
       setup_future_usage: "off_session",
+      description: await createDescription(products, dbClient),
       metadata: { order_id: newOrder.id },
     };
 
